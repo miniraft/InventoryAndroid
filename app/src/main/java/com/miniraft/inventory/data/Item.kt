@@ -5,9 +5,9 @@ import androidx.room.PrimaryKey
 import androidx.room.TypeConverter
 
 enum class ItemStatus(val label: String) {
-    IN_STOCK("In Stock"),
+    CRITICAL("Critical"),
     LOW_STOCK("Low Stock"),
-    CRITICAL("Critical")
+    IN_STOCK("In Stock")
 }
 
 object ItemStatusConverter {
