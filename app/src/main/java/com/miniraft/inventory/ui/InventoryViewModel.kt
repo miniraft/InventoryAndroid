@@ -33,10 +33,11 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     private val categoryDao = CategoryDatabase.getDatabase(application).categoryDao()
     private val prefs = application.getSharedPreferences("inventory_prefs", Context.MODE_PRIVATE)
 
-    val items: StateFlow<List<Item>> = itemDao.getAllItems().stateIn(
+    // Changed initialValue to null to represent a "loading" state
+    val items: StateFlow<List<Item>?> = itemDao.getAllItems().stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
-        initialValue = emptyList()
+        initialValue = null
     )
 
     val categories: StateFlow<List<Category>> = categoryDao.getAllCategories().stateIn(
@@ -52,8 +53,10 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
         _searchQuery.value = query
     }
 
-    // Moved heavy filtering off the UI thread
-    val filteredItems: StateFlow<List<Item>> = combine(items, _searchQuery) { list, query ->
+    // Now handles nullable list to delay UI rendering until DB is loaded
+    val filteredItems: StateFlow<List<Item>?> = combine(items, _searchQuery) { list, query ->
+        if (list == null) return@combine null
+
         if (query.isBlank()) {
             list
         } else {
@@ -65,7 +68,7 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
             }
         }
     }.flowOn(Dispatchers.Default)
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val _sortOption = MutableStateFlow(
         try {
@@ -140,7 +143,8 @@ class InventoryViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     fun canDeleteCategory(categoryName: String): Boolean {
-        return !items.value.any { it.category.equals(categoryName, ignoreCase = true) }
+        // Now safely checks against nullable list
+        return items.value?.none { it.category.equals(categoryName, ignoreCase = true) } ?: false
     }
 
     fun deleteCategory(category: Category, onError: ((String) -> Unit)? = null) {
